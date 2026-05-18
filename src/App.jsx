@@ -43,7 +43,7 @@ function App() {
           Alita 18
         </button>
 
-        <button onClick={() => agregarProducto("Papas", 5000)}>
+        <button onClick={() => agregarProducto("Papas", 0)}>
           Papas
         </button>
 
