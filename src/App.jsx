@@ -1,9 +1,19 @@
-import { useState } from "react";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useState, useEffect } from "react";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  onSnapshot,
+  query,
+  orderBy,
+} from "firebase/firestore";
 import { db } from "./firebase";
+
+const PRODUCTOS_COCINA = ["Papas", "Patacones", "Yuca"];
 
 function App() {
   const [pedido, setPedido] = useState([]);
+  const [pedidosActivos, setPedidosActivos] = useState([]);
 
   const agregarProducto = (nombre, precio) => {
     setPedido([...pedido, { nombre, precio }]);
@@ -17,34 +27,77 @@ function App() {
       return;
     }
 
-    try {
-      await addDoc(collection(db, "pedidos"), {
-        items: pedido,
-        total,
-        estado: "pendiente",
-        createdAt: serverTimestamp(),
-      });
+    // Filtrar solo productos que debe preparar la cocina
+    const cocinaItems = pedido
+      .filter((item) => PRODUCTOS_COCINA.includes(item.nombre))
+      .reduce((acc, item) => {
+        const existente = acc.find((x) => x.nombre === item.nombre);
 
-      alert("Pedido guardado correctamente");
-      setPedido([]);
-    } catch (error) {
-      console.error("Error al guardar:", error);
-      alert("Error al guardar el pedido");
-    }
+        if (existente) {
+          existente.cantidad += 1;
+        } else {
+          acc.push({
+            nombre: item.nombre,
+            cantidad: 1,
+          });
+        }
+
+        return acc;
+      }, []);
+
+    // Número consecutivo simple
+    const numero = Date.now();
+
+    await addDoc(collection(db, "pedidos"), {
+      numero,
+      items: pedido,
+      cocinaItems,
+      total,
+      estado: "pendiente",
+      createdAt: serverTimestamp(),
+    });
+
+    setPedido([]);
   };
+
+  useEffect(() => {
+    const q = query(
+      collection(db, "pedidos"),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const lista = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setPedidosActivos(lista.slice(0, 5));
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <div style={{ padding: "20px", fontFamily: "Arial" }}>
       <h1>🍔 El Rincón de Fredy</h1>
       <h2>Tomar Pedido</h2>
 
-      <div style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
         <button onClick={() => agregarProducto("Alita 18", 18000)}>
           Alita 18
         </button>
 
         <button onClick={() => agregarProducto("Papas", 0)}>
           Papas
+        </button>
+
+        <button onClick={() => agregarProducto("Patacones", 0)}>
+          Patacones
+        </button>
+
+        <button onClick={() => agregarProducto("Yuca", 0)}>
+          Yuca
         </button>
 
         <button onClick={() => agregarProducto("Coca-Cola", 4000)}>
@@ -64,16 +117,39 @@ function App() {
 
       <h2>Total: ${total.toLocaleString()}</h2>
 
-      <button
-        onClick={enviarPedido}
-        style={{
-          padding: "15px 30px",
-          fontSize: "18px",
-          marginTop: "20px",
-        }}
-      >
+      <button onClick={enviarPedido}>
         Enviar Pedido
       </button>
+
+      <hr style={{ margin: "30px 0" }} />
+
+      <h2>Pedidos Activos</h2>
+
+      {pedidosActivos.map((p) => (
+        <div
+          key={p.id}
+          style={{
+            border: "1px solid #ccc",
+            borderRadius: "8px",
+            padding: "10px",
+            marginBottom: "10px",
+          }}
+        >
+          <strong>Pedido #{p.numero}</strong>
+
+          <ul>
+            {p.items?.map((item, index) => (
+              <li key={index}>{item.nombre}</li>
+            ))}
+          </ul>
+
+          <strong>
+            {p.estado === "listo"
+              ? "✅ Listo para entregar"
+              : "⏳ En preparación"}
+          </strong>
+        </div>
+      ))}
     </div>
   );
 }

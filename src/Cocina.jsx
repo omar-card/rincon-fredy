@@ -1,12 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  collection,
-  onSnapshot,
-  query,
-  orderBy,
-  doc,
-  updateDoc,
-} from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "./firebase";
 
 function Cocina() {
@@ -19,9 +12,9 @@ function Cocina() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const lista = snapshot.docs.map((documento) => ({
-        id: documento.id,
-        ...documento.data(),
+      const lista = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
       }));
 
       setPedidos(lista);
@@ -30,18 +23,12 @@ function Cocina() {
     return () => unsubscribe();
   }, []);
 
-  const marcarListo = async (id) => {
-    await updateDoc(doc(db, "pedidos", id), {
-      estado: "listo",
-    });
-  };
-
   return (
     <div style={{ padding: "20px", fontFamily: "Arial" }}>
       <h1>🍟 Cocina</h1>
 
       {pedidos.length === 0 ? (
-        <p>No hay pedidos.</p>
+        <p>No hay pedidos pendientes.</p>
       ) : (
         pedidos.map((pedido) => (
           <div
@@ -53,28 +40,19 @@ function Cocina() {
               marginBottom: "10px",
             }}
           >
-            <h3>
-              Estado: {pedido.estado || "pendiente"}
-            </h3>
+            <h3>Pedido</h3>
 
             <ul>
-              {pedido.items?.map((item, index) => (
-                <li key={index}>{item.nombre}</li>
-              ))}
+              {pedido.cocinaItems?.map((item, index) => (
+                <li key={index}>
+                    {item.nombre} x{item.cantidad}
+                </li>
+            ))}
             </ul>
 
             <strong>
               Total: ${pedido.total?.toLocaleString()}
             </strong>
-
-            <br />
-            <br />
-
-            {pedido.estado !== "listo" && (
-              <button onClick={() => marcarListo(pedido.id)}>
-                ✅ Marcar como Listo
-              </button>
-            )}
           </div>
         ))
       )}
